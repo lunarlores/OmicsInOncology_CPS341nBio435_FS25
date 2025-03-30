@@ -191,7 +191,18 @@ this plot.
 
 ```{r create histogram of expression values}
 
+#Filter
+psme1_data <- PDdata %>% filter(Gene_name == "PSME1")
 
+# Plot histogram 
+ggplot(psme1_data, aes(x = Expression, fill = Response)) +
+  geom_histogram(bins = 30, position = "stack") +
+  labs(
+    title = "Expression of PSME1 by Response Group",
+    x = "Expression Level",
+    y = "Count"
+  ) +
+  theme_minimal()
 
 ```
 
@@ -243,7 +254,7 @@ use the 'head' function to show the **10** proteins with the lowest
 p-values. As you can see PSME1 is indeed upregulated (fold_change\>0).
 
 ```{r show t_tests}
-
+head(t_tests, 10)
 ```
 
 ### Check histograms to see if the fold_change makes sense
@@ -253,6 +264,28 @@ with different fold_changes, so you can show if the values from the
 table make sense.
 
 ```{r investigate with histograms}
+
+# function to plot expression histograms for a given gene
+plot_expression_histogram <- function(gene) {
+  PDdata %>%
+    filter(Gene_name == gene) %>%
+    ggplot(aes(x = Expression, fill = Response)) +
+    geom_histogram(bins = 30, position = "stack") +
+    labs(
+      title = paste("Expression of", gene, "by Response Group"),
+      x = "Expression Level",
+      y = "Count"
+    ) +
+    theme_minimal()
+}
+
+# Example proteins to investigate (you can pick from head(t_tests, 20))
+plot_expression_histogram("PSME1")
+plot_expression_histogram("CD74")
+plot_expression_histogram("HLA-A")
+plot_expression_histogram("TOMM22")  # choose one with near-zero fold change
+plot_expression_histogram("YBX1")    # choose one with negative fold change
+
 
 ```
 
@@ -326,9 +359,35 @@ samples.
 Create an `annotation_tile` based on the Response for each each patient
 sample.
 
-```{r}
+
+
+```{r create heatmap}
+
+# Get top 10 most significant genes
+top10_genes <- diseased_vs_healthy %>%
+  filter(significance != "ns") %>%
+  slice_min(order_by = p_value, n = 10) %>%
+  pull(Gene_name)
+
+# Prepare heatmap data with Response in the same tibble
+heatmap_data <- PDdata %>%
+  filter(Gene_name %in% top10_genes) %>%
+  select(Sample, Gene_name, Expression, Response)
+
+# Use the version-compatible tidyHeatmap syntax
+heatmap_data %>%
+  tidyHeatmap::heatmap(
+    .row = Sample,
+    .column = Gene_name,
+    .value = Expression
+  ) %>%
+  tidyHeatmap::annotation_tile(Response)
+
+
+
 
 ```
+
 ```{r}
 ```
 
@@ -350,7 +409,16 @@ significant proteins. Use the R `write` function to create a text file
 with just the names of the proteins. The dplyr `pull` and `slice`
 functions can be helpful here.
 
-```{r}
+```{r create protein list for STRING}
+
+# Extract top 1000 proteins by lowest p-value
+top_1000_proteins <- t_tests %>%
+  slice_min(order_by = p_value, n = 1000) %>%
+  pull(Gene_name)
+
+# Write to a text file
+write(top_1000_proteins, file = "top1000_proteins.txt")
+
 
 ```
 
